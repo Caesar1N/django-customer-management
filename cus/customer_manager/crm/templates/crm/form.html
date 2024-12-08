@@ -1,0 +1,102 @@
+{% extends 'crm/base.html' %}
+
+{% block content %}
+<h2 class="mt-4">{{ title }}</h2>
+
+<form id="customerForm" method="post" action="{{ form_action_url }}" enctype="multipart/form-data" class="needs-validation" novalidate>
+    {% csrf_token %}
+    <!-- Hidden field for customer id (if available) -->
+    {% if customer %}
+        <input type="hidden" name="customer" id="customer_id" value="{{ customer.id }}">
+    {% endif %}
+
+    <div class="form-group">
+        {% for field in form %}
+            <!-- Skip the 'customer' field if it exists, as we have added a hidden input for it -->
+            {% if field.name != 'customer' %}
+                <div class="mb-3">
+                    <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                    {{ field }}
+                    {% if field.help_text %}
+                        <small class="form-text text-muted">{{ field.help_text }}</small>
+                    {% endif %}
+                    {% for error in field.errors %}
+                        <div class="invalid-feedback">
+                            {{ error }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endfor %}
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+
+<a href="{% url 'customer_list' %}" class="btn btn-secondary mt-3">Back to Customer List</a>
+{% endblock %}
+
+{% block javascript %}
+<script>
+    // Add CSRF token to every AJAX request to handle CSRF protection in Django
+    $.ajaxSetup({
+        headers: { "X-CSRFToken": $("input[name=csrfmiddlewaretoken]").val() }
+    });
+
+    $(document).ready(function () {
+        // Attach a submit handler to the form
+        $('#customerForm').on('submit', function (event) {
+            event.preventDefault();  // Prevent the default form submission
+
+            // Create FormData object
+            let formData = new FormData(this);
+
+            // Make AJAX request
+            $.ajax({
+                type: 'POST',
+                url: $('#customerForm').attr('action'),  // Use the form action URL
+                data: formData,  // Use FormData for file uploads
+                processData: false,  // Prevent jQuery from converting the data
+                contentType: false,  // Set content type to false for multipart/form-data
+                success: function (response) {
+                    if (response.success) {
+                        alert(response.message);
+                        window.location.href = "{% url 'customer_list' %}";
+                    } else {
+                        // If the form has errors, display them
+                        for (const [field, errors] of Object.entries(response.errors)) {
+                            const fieldEl = $(`[name=${field}]`);
+                            fieldEl.removeClass('is-valid').addClass('is-invalid');
+                            fieldEl.siblings('.invalid-feedback').remove();
+
+                            errors.forEach(function (error) {
+                                fieldEl.after(`<div class="invalid-feedback">${error}</div>`);
+                            });
+                        }
+                    }
+                },
+                error: function (xhr, status, error) {
+                    console.error('An error occurred: ', error);
+                    alert('An error occurred: ' + error + '. Please try again.');
+                }
+            });
+        });
+
+        // Bootstrap Validation Handling
+        (function () {
+            'use strict';
+            window.addEventListener('load', function () {
+                var forms = document.getElementsByClassName('needs-validation');
+                Array.prototype.filter.call(forms, function (form) {
+                    form.addEventListener('submit', function (event) {
+                        if (form.checkValidity() === false) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+                    }, false);
+                });
+            }, false);
+        })();
+    });
+</script>
+{% endblock %}

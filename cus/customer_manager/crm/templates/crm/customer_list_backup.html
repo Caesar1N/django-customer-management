@@ -1,0 +1,38 @@
+	{% extends 'crm/base.html' %}
+
+{% block content %}
+<h2>Customers</h2>
+<a href="{% url 'customer_create' %}">Add Customer</a>
+<ul>
+    {% for customer in customers %}
+      <li>
+        {{ customer.name }} - 
+        Age: {{ customer.age }} - 
+        Sex: {{ customer.get_sex_display }} -
+        Treatments: {{ customer.treatment.all|join:", " }} -
+        <a href="{% url 'invoice_create' customer.id %}">Add Invoice</a> - 
+        <a href="{% url 'message_schedule' customer.id %}">Schedule Message</a> - 
+        <a href="{% url 'customer_detail' customer.id %}">View Details</a>
+      </li>
+    {% endfor %}
+</ul>
+
+<h3>Due Reminders</h3>
+{% if due_messages %}
+    <ul>
+        {% for message in due_messages %}
+            <li>
+                Reminder for {{ message.customer.name }} - Scheduled on: {{ message.schedule_date }} - Type: {{ message.message_type }}
+                <form method="post" action="{% url 'mark_reminder_sent' message.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">Mark as Done</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No due reminders at this time.</p>
+{% endif %}
+
+{% endblock %}
+

@@ -1,0 +1,82 @@
+{% extends 'crm/base.html' %}
+
+{% block content %}
+<h2 class="mt-4">{{ title }}</h2>
+<form id="customerForm" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+    {% csrf_token %}
+    <div class="form-group">
+        {% for field in form %}
+            <div class="mb-3">
+                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                {{ field }}
+                {% if field.help_text %}
+                    <small class="form-text text-muted">{{ field.help_text }}</small>
+                {% endif %}
+                {% for error in field.errors %}
+                    <div class="invalid-feedback">
+                        {{ error }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endfor %}
+    </div>
+    <button type="submit" class="btn btn-primary">Save</button>
+</form>
+<a href="{% url 'customer_list' %}" class="btn btn-secondary mt-3">Back to Customer List</a>
+{% endblock %}
+
+{% block javascript %}
+<script>
+    // Adding Bootstrap validation to highlight invalid fields
+    (function () {
+        'use strict';
+        window.addEventListener('load', function () {
+            // Fetch all forms with needs-validation class
+            var forms = document.getElementsByClassName('needs-validation');
+            // Loop over them and prevent submission
+            Array.prototype.filter.call(forms, function (form) {
+                form.addEventListener('submit', function (event) {
+                    if (form.checkValidity() === false) {
+                        event.preventDefault();
+                        event.stopPropagation();
+                    }
+                    form.classList.add('was-validated');
+                }, false);
+            });
+        }, false);
+    })();
+
+    // Adding AJAX form submission
+    $(document).ready(function () {
+        $('#customerForm').on('submit', function (event) {
+            event.preventDefault();  // Prevent the default form submission
+
+            $.ajax({
+                type: 'POST',
+                url: "{% url 'customer_create' %}",
+                data: $(this).serialize(),
+                success: function (response) {
+                    if (response.success) {
+                        alert(response.message);
+                        window.location.href = "{% url 'customer_list' %}";
+                    } else {
+                        // Handle form errors and display them
+                        for (const [field, errors] of Object.entries(response.errors)) {
+                            const fieldEl = $(`[name=${field}]`);
+                            fieldEl.addClass('is-invalid');
+                            fieldEl.siblings('.invalid-feedback').remove(); // Remove old errors
+                            errors.forEach(function (error) {
+                                fieldEl.after(`<div class="invalid-feedback">${error}</div>`);
+                            });
+                        }
+                    }
+                },
+                error: function (xhr, status, error) {
+                    alert('An error occurred. Please try again.');
+                }
+            });
+        });
+    });
+</script>
+{% endblock %}
+

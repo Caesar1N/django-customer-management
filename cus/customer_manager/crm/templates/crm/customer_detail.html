@@ -1,0 +1,87 @@
+{% extends 'crm/base.html' %}
+
+{% block content %}
+<h2>Customer Details</h2>
+<p><strong>Name:</strong> {{ customer.name }}</p>
+<p><strong>Email:</strong> {{ customer.email }}</p>
+<p><strong>Phone Number:</strong> {{ customer.phone_number }}</p>
+<p><strong>Address:</strong> {{ customer.address }}</p>
+<p><strong>Problem:</strong> {{ customer.problem }}</p>
+<p><strong>Age:</strong> {{ customer.age }}</p>
+<p><strong>Sex:</strong> {{ customer.get_sex_display }}</p>
+
+{% if customer.treatment.all %}
+    <p><strong>Treatments:</strong> {{ customer.treatment.all|join:", " }}</p>
+{% else %}
+    <p><strong>Treatments:</strong> None</p>
+{% endif %}
+
+<!-- <h3>Invoices</h3>
+<ul>
+    {% for invoice in invoices %}
+        <li>
+            Amount: {{ invoice.amount }} - Date: {{ invoice.date_created }} - 
+            {% if invoice.receipt %}
+                <a href="{{ invoice.receipt.url }}">View Receipt</a>
+            {% else %}
+                No Receipt Available
+            {% endif %}
+        </li>
+    {% empty %}
+        <li>No invoices available for this customer.</li>
+    {% endfor %}
+</ul> -->
+
+<h3 class="mt-4">Invoices</h3>
+{% if invoices %}
+    <ul class="list-group">
+        {% for invoice in invoices %}
+            <li class="list-group-item">
+                <strong>Invoice #{{ invoice.id }}</strong> - Amount: ₹{{ invoice.amount }} - Created: {{ invoice.date_created|date:"Y-m-d H:i" }}
+                {% if invoice.receipt %}
+                    <br>
+                    <a href="{{ invoice.receipt.url }}" target="_blank">View Receipt</a>
+                {% endif %}
+                <!-- Add Send via WhatsApp and Email buttons -->
+                <div class="mt-2">
+                    <a href="{% url 'send_invoice_whatsapp' customer.id invoice.id %}" class="btn btn-success btn-sm">Send via WhatsApp</a>
+                    <a href="{% url 'send_invoice_email' customer.id invoice.id %}" class="btn btn-info btn-sm">Send via Email</a>
+                </div>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No invoices available for this customer.</p>
+{% endif %}
+
+
+<!-- <h3>Scheduled Messages</h3>
+<ul>
+    {% for message in scheduled_messages %}
+        <li>
+            Type: {{ message.message_type }} - Date: {{ message.schedule_date }} - 
+            Content: {{ message.message_content }} - Sent: {{ message.is_sent }}
+        </li>
+    {% empty %}
+        <li>No messages scheduled for this customer.</li>
+    {% endfor %}
+</ul> -->
+
+<h3 class="mt-4">Scheduled Messages</h3>
+{% if messages %}
+    <ul class="list-group">
+        {% for message in messages %}
+            <li class="list-group-item">
+                <strong>Scheduled Date:</strong> {{ message.schedule_date|date:"Y-m-d H:i" }}<br>
+                <strong>Message Content:</strong> {{ message.message_content }}<br>
+                <strong>Message Type:</strong> {{ message.message_type }}
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No messages scheduled for this customer.</p>
+{% endif %}
+
+<a href="{% url 'invoice_create' customer.id %}" class="btn btn-primary mt-3">Add Invoice</a>
+<a href="{% url 'customer_list' %}" class="btn btn-secondary mt-3">Back to Customer List</a>
+{% endblock %}

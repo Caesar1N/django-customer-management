@@ -1,0 +1,318 @@
+### *Django Customer Management App Documentation*
+
+---
+
+#### *1. Project Overview*
+
+This project is a *Customer Management Django App* where users can:
+1. Add customers.
+2. Attach receipts for invoices.
+3. Schedule WhatsApp or SMS messages to customers.
+4. View all customer information.
+5. See reminders when scheduled messages are due and acknowledge them.
+
+---
+
+#### *2. Directory Structure*
+
+The directory structure of the Django app (customer_manager) is as follows:
+
+
+customer_manager/
+├── crm/
+│   ├── migrations/
+│   ├── templates/
+│   │   └── crm/
+│   │       ├── customer_list.html
+│   │       ├── customer_detail.html
+│   │       └── form.html
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── forms.py
+│   ├── models.py
+│   ├── views.py
+│   ├── urls.py
+│   └── tests.py
+├── customer_manager/
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   └── wsgi.py
+└── manage.py
+
+
+---
+
+#### *3. Models*
+
+The *crm/models.py* contains the following models:
+
+python
+from django.db import models
+from datetime import datetime
+
+class Customer(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=15)
+    address = models.TextField()
+
+    def __str__(self):
+        return self.name
+
+class Invoice(models.Model):
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    date_created = models.DateTimeField(auto_now_add=True)
+    receipt = models.FileField(upload_to='receipts/')
+
+    def __str__(self):
+        return f"Invoice {self.id} - {self.customer.name}"
+
+class MessageSchedule(models.Model):
+    MESSAGE_TYPES = (
+        ('SMS', 'SMS'),
+        ('WhatsApp', 'WhatsApp'),
+    )
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
+    message_content = models.TextField()
+    schedule_date = models.DateTimeField()
+    message_type = models.CharField(choices=MESSAGE_TYPES, max_length=10)
+    is_sent = models.BooleanField(default=False)
+    is_reminder_sent = models.BooleanField(default=False)  # Tracks if reminder has been acknowledged
+
+    def __str__(self):
+        return f"Message to {self.customer.name} at {self.schedule_date}"
+
+
+---
+
+#### *4. Forms*
+
+The *crm/forms.py* contains forms for creating and updating models:
+
+python
+from django import forms
+from .models import Customer, Invoice, MessageSchedule
+from bootstrap_datepicker_plus.widgets import DateTimePickerInput
+
+class CustomerForm(forms.ModelForm):
+    class Meta:
+        model = Customer
+        fields = '__all__'
+
+class InvoiceForm(forms.ModelForm):
+    class Meta:
+        model = Invoice
+        fields = '__all__'
+
+class MessageScheduleForm(forms.ModelForm):
+    class Meta:
+        model = MessageSchedule
+        fields = '__all__'
+        widgets = {
+            'schedule_date': DateTimePickerInput(),
+        }
+
+
+---
+
+#### *5. Views*
+
+The *crm/views.py* file defines various views to handle CRUD operations:
+
+python
+from django.shortcuts import render, redirect, get_object_or_404
+from django.utils import timezone
+from .models import Customer, Invoice, MessageSchedule
+from .forms import CustomerForm, InvoiceForm, MessageScheduleForm
+from threading import Timer
+
+def customer_list(request):
+    customers = Customer.objects.all()
+    # Get messages that are due and haven't been acknowledged
+    now = timezone.now()
+    due_messages = MessageSchedule.objects.filter(schedule_date__lte=now, is_reminder_sent=False, is_sent=False)
+    return render(request, 'crm/customer_list.html', {
+        'customers': customers,
+        'due_messages': due_messages
+    })
+
+def customer_create(request):
+    if request.method == 'POST':
+        form = CustomerForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('customer_list')
+    else:
+        form = CustomerForm()
+    return render(request, 'crm/form.html', {'form': form})
+
+def invoice_create(request, customer_id):
+    customer = get_object_or_404(Customer, id=customer_id)
+    if request.method == 'POST':
+        form = InvoiceForm(request.POST, request.FILES)
+        if form.is_valid():
+            invoice = form.save(commit=False)
+            invoice.customer = customer
+            invoice.save()
+            return redirect('customer_list')
+    else:
+        form = InvoiceForm()
+    return render(request, 'crm/form.html', {'form': form, 'customer': customer})
+
+def message_schedule(request, customer_id):
+    customer = get_object_or_404(Customer, id=customer_id)
+    if request.method == 'POST':
+        form = MessageScheduleForm(request.POST)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.customer = customer
+            message.save()
+            schedule_message_send(message)
+            return redirect('customer_list')
+    else:
+        form = MessageScheduleForm()
+    return render(request, 'crm/form.html', {'form': form, 'customer': customer})
+
+def schedule_message_send(message):
+    delay = (message.schedule_date - timezone.now()).total_seconds()
+    Timer(delay, send_message, [message]).start()
+
+def send_message(message):
+    # Simulated sending of message
+    print(f"Sending {message.message_type} to {message.customer.phone_number}: {message.message_content}")
+    message.is_sent = True
+    message.save()
+
+def mark_reminder_sent(request, message_id):
+    message = get_object_or_404(MessageSchedule, id=message_id)
+    if request.method == 'POST':
+        message.is_reminder_sent = True
+        message.save()
+    return redirect('customer_list')
+
+
+---
+
+#### *6. URLs*
+
+The *crm/urls.py* contains URL patterns to link views with paths:
+
+python
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('', views.customer_list, name='customer_list'),
+    path('customer/create/', views.customer_create, name='customer_create'),
+    path('customer/<int:customer_id>/', views.customer_detail, name='customer_detail'),
+    path('invoice/create/<int:customer_id>/', views.invoice_create, name='invoice_create'),
+    path('message/schedule/<int:customer_id>/', views.message_schedule, name='message_schedule'),
+    path('mark-reminder-sent/<int:message_id>/', views.mark_reminder_sent, name='mark_reminder_sent'),
+]
+
+
+---
+
+#### *7. Templates*
+
+- *customer_list.html*: Displays all customers and due reminders.
+- *customer_detail.html*: Displays details for each customer, including invoices and scheduled messages.
+- *form.html*: Generic form template for adding/editing customers, invoices, and scheduling messages.
+
+*customer_list.html* Example:
+
+html
+<h2>Customers</h2>
+<a href="{% url 'customer_create' %}">Add Customer</a>
+<ul>
+    {% for customer in customers %}
+      <li>
+        {{ customer.name }} - 
+        <a href="{% url 'invoice_create' customer.id %}">Add Invoice</a> - 
+        <a href="{% url 'message_schedule' customer.id %}">Schedule Message</a> - 
+        <a href="{% url 'customer_detail' customer.id %}">View Details</a>
+      </li>
+    {% endfor %}
+</ul>
+
+<h3>Due Reminders</h3>
+{% if due_messages %}
+    <ul>
+        {% for message in due_messages %}
+            <li>
+                Reminder for {{ message.customer.name }} - Scheduled on: {{ message.schedule_date }} - Type: {{ message.message_type }}
+                <form method="post" action="{% url 'mark_reminder_sent' message.id %}">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">Mark as Done</button>
+                </form>
+            </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p>No due reminders at this time.</p>
+{% endif %}
+
+
+---
+
+#### *8. Settings for Media Files*
+
+To handle file uploads:
+
+- *settings.py*:
+  python
+  import os
+
+  MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+  MEDIA_URL = '/media/'
+  
+
+- Add static handling to *customer_manager/urls.py*:
+  python
+  from django.conf import settings
+  from django.conf.urls.static import static
+
+  urlpatterns = [
+      path('admin/', admin.site.urls),
+      path('', include('crm.urls')),
+  ]
+
+  if settings.DEBUG:
+      urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+  
+
+---
+
+#### *9. How to Run the Project*
+
+1. *Migrate Database*:
+   bash
+   python manage.py makemigrations
+   python manage.py migrate
+   
+
+2. *Create Superuser (Optional for Admin Site)*:
+   bash
+   python manage.py createsuperuser
+   
+
+3. *Run Server*:
+   bash
+   python manage.py runserver
+   
+
+---
+
+#### *10. Feature Summary*
+
+- *Customer Management*: Add, view, and edit customer details.
+- *Invoice Management*: Attach receipts to customer invoices.
+- *Message Scheduling*: Schedule WhatsApp/SMS messages.
+- *Reminders*: Due reminders are shown on the homepage, and reminders can be marked as done.
+
+---
+
+This document contains all the key information about your Django project, including directory structure, models, forms, views, URLs, and how to implement the reminder feature. It will also serve as a reference point if you need to restore the context of this app in the future.
