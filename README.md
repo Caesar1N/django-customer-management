@@ -42,22 +42,29 @@ This is a **Django-based Customer Management Application** designed to streamlin
    cd django-customer-management
 
 2. Create a virtual environment and activate it:
+    ```bash
     python3 -m venv venv
-    source venv/bin/activate  # On Windows: venv\Scripts\activate
+    source venv/bin/activate
 
-3. Install dependencies:
+ On Windows:
+      
+    venv\Scripts\activate
 
+4. Install dependencies:
+   ```bash
     pip install -r requirements.txt
 
-4. Apply migrations:
+5. Apply migrations:
 
+   ```bash
     python manage.py migrate
 
-5. Run the development server:
+6. Run the development server:
 
+   ```bash
     python manage.py runserver
 
-6. Open the app in your browser:
+7. Open the app in your browser:
 
     http://127.0.0.1:8000
     
@@ -97,13 +104,16 @@ Contributions are welcome! Please follow these steps:
 1. Fork the repository.
 
 2. Create a feature branch:
-    git checkout -b feature/your-feature-name
+   ```bash
+       git checkout -b feature/your-feature-name
 
 3. Commit your changes:
-    git commit -m "Add a meaningful commit message"
+   ```bash
+       git commit -m "Add a meaningful commit message"
 
 4. Push to the branch:
-    git push origin feature/your-feature-name
+   ```bash
+       git push origin feature/your-feature-name
 
 5. Create a pull request.
 
@@ -111,7 +121,7 @@ Contributions are welcome! Please follow these steps:
 This project is licensed under the MIT License. See the LICENSE file for details.
 
 ### Acknowledgements
-Django
-Bootstrap
-jQuery
-Moment.js
+# Django
+# Bootstrap
+# jQuery
+# Moment.js
