@@ -58,7 +58,7 @@ def customer_create(request):
         form = CustomerForm()
 
     # Render the customer creation form
-    return render(request, 'crm/form.html', {'form': form, 'title': 'Add Customer'})
+    return render(request, 'crm/form.html', {'form': form, 'title': 'Add Customer', 'form_action_url': reverse('customer_create') })
 
 # 2. Invoice Create View (Updated for Modern AJAX Handling)
 def invoice_create(request, customer_id):

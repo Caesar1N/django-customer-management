@@ -96,41 +96,41 @@
         $('#customerModal').on('shown.bs.modal', function () {
             $.get("{% url 'customer_create' %}", function (data) {
                 $('#customerModal .modal-body').html(data);
-                // Attach submit handler after loading the form dynamically
-                $('#customerForm').on('submit', function (event) {
-                    event.preventDefault();  // Prevent the default form submission
+                // // Attach submit handler after loading the form dynamically
+                // $('#customerForm').on('submit', function (event) {
+                //     event.preventDefault();  // Prevent the default form submission
 
-                    // Make AJAX request to create customer
-                    $.ajax({
-                        type: 'POST',
-                        url: $(this).attr('action'),  // Use form action URL
-                        data: new FormData(this),  // Use FormData for file uploads
-                        processData: false,  // Do not process data
-                        contentType: false,  // Set content type to false for multipart
-                        success: function (response) {
-                            if (response.success) {
-                                // Close modal, show success alert and reload customer list
-                                $('#customerModal').modal('hide');
-                                alert(response.message);
-                                location.reload();
-                            } else {
-                                // Display form errors
-                                for (const [field, errors] of Object.entries(response.errors)) {
-                                    const fieldEl = $(`[name=${field}]`);
-                                    fieldEl.removeClass('is-valid').addClass('is-invalid');
-                                    fieldEl.siblings('.invalid-feedback').remove();
+                //     // Make AJAX request to create customer
+                //     $.ajax({
+                //         type: 'POST',
+                //         url: $(this).attr('action'),  // Use form action URL
+                //         data: new FormData(this),  // Use FormData for file uploads
+                //         processData: false,  // Do not process data
+                //         contentType: false,  // Set content type to false for multipart
+                //         success: function (response) {
+                //             if (response.success) {
+                //                 // Close modal, show success alert and reload customer list
+                //                 $('#customerModal').modal('hide');
+                //                 alert(response.message);
+                //                 location.reload();
+                //             } else {
+                //                 // Display form errors
+                //                 for (const [field, errors] of Object.entries(response.errors)) {
+                //                     const fieldEl = $(`[name=${field}]`);
+                //                     fieldEl.removeClass('is-valid').addClass('is-invalid');
+                //                     fieldEl.siblings('.invalid-feedback').remove();
 
-                                    errors.forEach(function (error) {
-                                        fieldEl.after(`<div class="invalid-feedback">${error}</div>`);
-                                    });
-                                }
-                            }
-                        },
-                        error: function (xhr, status, error) {
-                            alert('An error occurred: ' + error + '. Please try again.');
-                        }
-                    });
-                });
+                //                     errors.forEach(function (error) {
+                //                         fieldEl.after(`<div class="invalid-feedback">${error}</div>`);
+                //                     });
+                //                 }
+                //             }
+                //         },
+                //         error: function (xhr, status, error) {
+                //             alert('An error occurred: ' + error + '. Please try again.');
+                //         }
+                //     });
+                // });
             });
         });
 
