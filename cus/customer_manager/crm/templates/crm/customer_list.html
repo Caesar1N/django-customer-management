@@ -15,22 +15,72 @@
     {% endfor %}
 {% endif %}
 
+<!-- Search Form -->
+<form method="get" action="">
+    <div class="form-group d-flex" style="max-width: 400px;">
+        <input type="text" name="search" value="{{ search_query|default_if_none:'' }}" 
+               class="form-control mr-2" placeholder="Search by name or phone...">
+        <button type="submit" class="btn btn-primary">Search</button>
+    </div>
+</form>
+
 <!-- Add Customer Button to trigger modal -->
 <button type="button" class="btn btn-success mb-3" data-toggle="modal" data-target="#customerModal">
     Add Customer
 </button>
 
+<!-- List of Customers -->
 <ul class="list-group">
     {% for customer in customers %}
         {% if customer.id %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                {{ customer.name }} - {{ customer.phone_number }}
+                <!-- Customer Info -->
+                <!-- Make Customer Name Clickable -->
+                <div>
+                    <a href="{% url 'customer_detail' customer.id %}">
+                        {{ customer.name }} - {{ customer.phone_number }}
+                    </a>
+                </div>
+
+                <!-- Actions -->
                 <div class="btn-group">
-                    <!-- Updated to include customer ID in data attribute -->
-                    <button type="button" class="btn btn-info btn-sm schedule-message-btn" data-toggle="modal" data-target="#messageModal" data-customer-id="{{ customer.id }}">
+                    <!-- Schedule Message -->
+                    <button type="button" 
+                            class="btn btn-info btn-sm schedule-message-btn" 
+                            data-toggle="modal" 
+                            data-target="#messageModal" 
+                            data-customer-id="{{ customer.id }}">
                         Schedule Message
                     </button>
-                    <a href="{% url 'customer_detail' customer.id %}" class="btn btn-secondary btn-sm">View Details</a>
+
+                    <!-- Mark as Done if next_message exists -->
+                    {% if customer.next_message %}
+                        <button type="button" 
+                                class="btn btn-success btn-sm mark-done-btn" 
+                                data-message-id="{{ customer.next_message.id }}">
+                            Mark as Done
+                        </button>
+                    {% endif %}
+
+                    <!-- View Details
+                    <a href="{% url 'customer_detail' customer.id %}" 
+                       class="btn btn-secondary btn-sm">
+                        View Details
+                    </a> -->
+
+                    <!-- Edit -->
+                    <a href="{% url 'customer_update' customer.id %}" 
+                       class="btn btn-warning btn-sm">
+                        Edit
+                    </a>
+
+                    <!-- Delete (non-AJAX) -->
+                    <form action="{% url 'customer_delete' customer.id %}" method="POST" style="display:inline;">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            Delete
+                        </button>
+                    </form>
                 </div>
             </li>
         {% endif %}
@@ -48,7 +98,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <!-- Form content will be loaded dynamically using AJAX -->
+                <!-- Form content loaded dynamically via AJAX -->
             </div>
         </div>
     </div>
@@ -65,7 +115,7 @@
                 </button>
             </div>
             <div class="modal-body">
-                <!-- Form content will be loaded dynamically using AJAX -->
+                <!-- Form content loaded dynamically via AJAX -->
             </div>
         </div>
     </div>
@@ -76,8 +126,12 @@
     <ul class="list-group">
         {% for message in due_messages %}
             <li class="list-group-item d-flex justify-content-between align-items-center">
-                Reminder for {{ message.customer.name }} - Scheduled on: {{ message.schedule_date }} - Type: {{ message.message_type }}
-                <button type="button" class="btn btn-success btn-sm mark-done-btn" data-message-id="{{ message.id }}">
+                Reminder for {{ message.customer.name }} 
+                - Scheduled on: {{ message.schedule_date }} 
+                - Type: {{ message.message_type }}
+                <button type="button" 
+                        class="btn btn-success btn-sm mark-done-btn" 
+                        data-message-id="{{ message.id }}">
                     Mark as Done
                 </button>
             </li>
@@ -143,18 +197,15 @@
                     $('#messageModal .modal-body').html(data);
                     // Attach submit handler after loading the form dynamically
                     $('#messageForm').on('submit', function (event) {
-                        event.preventDefault();  // Prevent the default form submission
-
-                        // Make AJAX request to schedule message
+                        event.preventDefault();  // Prevent default
                         $.ajax({
                             type: 'POST',
-                            url: $(this).attr('action'),  // Use the form action URL
-                            data: new FormData(this),  // Update to use FormData for better compatibility
+                            url: $(this).attr('action'),
+                            data: new FormData(this),
                             processData: false,
                             contentType: false,
                             success: function (response) {
                                 if (response.success) {
-                                    // Close modal, show success alert and reload reminders
                                     $('#messageModal').modal('hide');
                                     alert(response.message);
                                     location.reload();
@@ -164,7 +215,6 @@
                                         const fieldEl = $(`[name=${field}]`);
                                         fieldEl.removeClass('is-valid').addClass('is-invalid');
                                         fieldEl.siblings('.invalid-feedback').remove();
-
                                         errors.forEach(function (error) {
                                             fieldEl.after(`<div class="invalid-feedback">${error}</div>`);
                                         });

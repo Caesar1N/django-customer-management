@@ -1,6 +1,7 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse
 from django.utils import timezone
+from django.db.models import Min, Q, Case, When, Value, BooleanField
 from .models import Customer, Invoice, MessageSchedule
 from .forms import CustomerForm, InvoiceForm, MessageScheduleForm
 from threading import Timer
@@ -56,9 +57,13 @@ def customer_create(request):
     else:
         # If GET request, display an empty form
         form = CustomerForm()
+    return render(request, 'crm/form.html', {
+        'form': form,
+        'title': 'Add Customer',
+        'form_action_url': reverse('customer_create')
+    })
 
     # Render the customer creation form
-    return render(request, 'crm/form.html', {'form': form, 'title': 'Add Customer', 'form_action_url': reverse('customer_create') })
 
 # 2. Invoice Create View (Updated for Modern AJAX Handling)
 def invoice_create(request, customer_id):
@@ -87,7 +92,11 @@ def invoice_create(request, customer_id):
                     )
                 except Exception as e:
                     form.add_error('receipt', f"Error converting image to PDF: {str(e)}")
-                    return render(request, 'crm/form.html', {'form': form, 'customer': customer, 'title': 'Add Invoice'})
+                    return render(request, 'crm/form.html', {
+                        'form': form,
+                        'customer': customer,
+                        'title': 'Add Invoice'
+                    })
             else:
                 # Save the original PDF file if it's already a PDF
                 invoice.receipt = uploaded_file
@@ -187,15 +196,92 @@ def mark_reminder_sent(request, message_id):
             return JsonResponse({'success': True, 'message': 'Reminder marked as sent!'})
     return redirect('customer_list')
 
-# Customer List Function
+# --------------------- NEW: Customer Update and Delete Views ---------------------
+def customer_update(request, customer_id):
+    """Edit an existing Customer."""
+    customer = get_object_or_404(Customer, id=customer_id)
+    if request.method == 'POST':
+        form = CustomerForm(request.POST, instance=customer)
+        if form.is_valid():
+            form.save()
+            messages.success(request, f"Customer '{customer.name}' updated successfully!")
+            # If AJAX:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': True, 'message': 'Customer updated successfully!'})
+            return redirect('customer_list')
+        else:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+                return JsonResponse({'success': False, 'errors': form.errors})
+    else:
+        form = CustomerForm(instance=customer)
+
+    return render(request, 'crm/form.html', {
+        'form': form,
+        'title': 'Edit Customer',
+        'form_action_url': reverse('customer_update', args=[customer.id]),
+    })
+
+def customer_delete(request, customer_id):
+    """Delete a Customer."""
+    customer = get_object_or_404(Customer, id=customer_id)
+    if request.method == 'POST':
+        customer_name = customer.name
+        customer.delete()
+        messages.success(request, f"Customer '{customer_name}' deleted successfully!")
+        # If AJAX:
+        if request.headers.get('x-requested-with') == 'XMLHttpRequest':
+            return JsonResponse({'success': True})
+        return redirect('customer_list')
+
+    # If GET, render a confirm-delete page or reuse a modal, etc.
+    return render(request, 'crm/customer_confirm_delete.html', {
+        'customer': customer
+    })
+
+# 5. Updated Customer List Function
 def customer_list(request):
-    customers = Customer.objects.all()
-    # Get messages that are due and haven't been acknowledged
+    # 1) Annotate each customer with earliest schedule date
+    customers = Customer.objects.annotate(
+        earliest_schedule_date=Min('messageschedule__schedule_date')
+    )
+
+    # 2) Sort by earliest schedule date (those without schedules will have earliest_schedule_date=None)
+    # To put those with no schedules last, we can do a boolean sort:
+    customers = customers.annotate(
+        has_schedule=Case(
+            When(earliest_schedule_date__isnull=False, then=Value(True)),
+            default=Value(False),
+            output_field=BooleanField()
+        )
+    ).order_by('-has_schedule', 'earliest_schedule_date')
+
+    # 3) Search (by name or phone)
+    search_query = request.GET.get('search')
+    if search_query:
+        customers = customers.filter(
+            Q(name__icontains=search_query) |
+            Q(phone_number__icontains=search_query)
+        )
+
+    # 4) For each customer, get the earliest unsent message to show "Mark as Done" (if needed)
+    #    We'll store it in an attribute "next_message".
+    for c in customers:
+        c.next_message = (
+            MessageSchedule.objects.filter(customer=c, is_sent=False)
+            .order_by('schedule_date')
+            .first()
+        )
+
+    # 5) Retrieve due_messages for the "Due Reminders" section
     now = timezone.now()
-    due_messages = MessageSchedule.objects.filter(schedule_date__lte=now, is_reminder_sent=False, is_sent=False)
+    due_messages = MessageSchedule.objects.filter(
+        schedule_date__lte=now, is_reminder_sent=False, is_sent=False
+    )
+
     return render(request, 'crm/customer_list.html', {
         'customers': customers,
-        'due_messages': due_messages
+        'due_messages': due_messages,
+        'search_query': search_query,  # to keep the search input in the template
     })
 
 # Customer Detail
@@ -232,7 +318,10 @@ def send_invoice_email(request, customer_id, invoice_id):
 
     # Sending Email using Django's send_mail function
     subject = f"Invoice #{invoice.id} from Customer Management App"
-    message = f"Dear {customer.name},\n\nPlease find the details of your invoice.\n\nInvoice Amount: ${invoice.amount}\nDate: {invoice.date_created}\n\nThank you."
+    message = (
+        f"Dear {customer.name},\n\nPlease find the details of your invoice.\n\n"
+        f"Invoice Amount: ${invoice.amount}\nDate: {invoice.date_created}\n\nThank you."
+    )
     recipient_list = [customer.email]
 
     try:
